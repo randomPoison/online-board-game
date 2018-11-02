@@ -4,6 +4,8 @@ version = "0.1.0"
 authors = ["David LeGare <dlegare.1001@gmail.com>"]
 
 [dependencies]
+actix = "0.7.5"
 actix-web = "0.7.13"
+futures = "0.1.25"
 log = "0.4.6"
 log4rs = { version = "0.8.1", features = ["toml_format"] }

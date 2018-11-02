@@ -8,10 +8,9 @@ kind = "pattern"
 pattern = "{d(%Y-%m-%d %H:%M:%S%.3f)} {h({l:<5})} {t} - {m}{n}"
 
 [root]
-level = "info"
+level = "warn"
 appenders = ["stdout"]
 
 [loggers]
-client = { level = "debug" }
-server = { level = "debug" }
-core = { level = "debug" }
+actix_web = { level = "info" }
+online_board_game = { level = "debug" }
