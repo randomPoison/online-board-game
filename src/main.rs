@@ -24,11 +24,20 @@ fn main() {
     server::new(move || {
         let game_addr = game_addr.clone();
         App::new()
+            // Capture log output coming from actix_web.
             .middleware(Logger::default())
+
+            // Listen for websocket connections from clients and spawn a new `ClientController`
+            // for each new connection.
             .resource("/ws/", move |resource| {
                 let game_addr = game_addr.clone();
                 resource.f(move |req| ws::start(req, ClientController::new(game_addr.clone())))
-            }).resource("/", |resource| resource.f(index))
+            })
+
+            // Serve index.html if someone browses to the root.
+            .resource("/", |resource| resource.f(index))
+
+            // Server any other file requests out of the static files directory.
             .handler(
                 "/",
                 StaticFiles::new("./static").unwrap().show_files_listing(),
