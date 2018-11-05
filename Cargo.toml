@@ -9,3 +9,6 @@ actix-web = "0.7.13"
 futures = "0.1.25"
 log = "0.4.6"
 log4rs = { version = "0.8.1", features = ["toml_format"] }
+serde = "1.0.80"
+serde_derive = "1.0.80"
+serde_json = "1.0.32"

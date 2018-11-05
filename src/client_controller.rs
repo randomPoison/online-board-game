@@ -1,9 +1,21 @@
 use actix::prelude::*;
 use actix_web::ws::{Message as WebsocketMessage, ProtocolError, WebsocketContext};
-use crate::game_controller::GameController;
+use crate::game_controller::*;
 use futures::Future;
 use log::*;
 
+/// Actor in charge of communicating with a connected client.
+///
+/// The client controller doesn't control or interact with the game state
+/// directly, rather it passes incoming inputs from the client to the
+/// [`GameController`], and then forwards state updates from the game controller
+/// back to the client.
+///
+/// On start it automatically notifes the game controller that a new client
+/// has connected. When the client disconnects it will stop itself and notify
+/// the game controller that the client has disconnected.
+///
+/// [`GameController`]: ../game_controller/struct.GameController.html
 #[derive(Debug)]
 pub struct ClientController {
     game: Addr<GameController>,
@@ -61,16 +73,31 @@ impl StreamHandler<WebsocketMessage, ProtocolError> for ClientController {
     }
 }
 
+impl Handler<StateUpdate> for ClientController {
+    type Result = ();
+
+    fn handle(&mut self, message: StateUpdate, ctx: &mut Self::Context) -> Self::Result {
+        let json = serde_json::to_string(&message).expect("Failed to serialize state update");
+        ctx.text(json);
+    }
+}
+
 /// Address of a [`ClientController`] actor.
 ///
 /// [`ClientController`]: ./struct.ClientController.html
 pub type ClientAddr = Addr<ClientController>;
 
+/// Message sent to the [`GameController`] when a client first connects.
+///
+/// [`GameController`]: ../game_controller/struct.GameController.html
 #[derive(Debug, Message)]
 pub struct ClientConnected {
     pub addr: Addr<ClientController>,
 }
 
+/// Message sent to the [`GameController`] when a client disconnects.
+///
+/// [`GameController`]: ../game_controller/struct.GameController.html
 #[derive(Debug, Message)]
 pub struct ClientDisconnected {
     pub addr: Addr<ClientController>,

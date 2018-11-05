@@ -3,6 +3,8 @@ extern crate actix_web;
 extern crate futures;
 extern crate log;
 extern crate log4rs;
+extern crate serde;
+extern crate serde_derive;
 
 use actix_web::actix::*;
 use actix_web::fs::*;
@@ -12,6 +14,7 @@ use crate::client_controller::ClientController;
 use crate::game_controller::GameController;
 
 mod client_controller;
+mod game;
 mod game_controller;
 
 fn main() {
@@ -71,7 +74,7 @@ fn index(_req: &HttpRequest) -> Result<NamedFile> {
 /// [`DefaultHasher`]: https://doc.rust-lang.org/std/collections/hash_map/struct.DefaultHasher.html
 /// [`Addr`]: https://docs.rs/actix/0/actix/struct.Addr.html
 /// [`Debug`]: https://doc.rust-lang.org/std/fmt/trait.Debug.html
-pub(crate) fn default_hash<H>(value: &H) -> u64 where H: std::hash::Hash {
+fn default_hash<H>(value: &H) -> u64 where H: std::hash::Hash {
     use std::hash::Hasher;
 
     let mut hasher = std::collections::hash_map::DefaultHasher::new();
