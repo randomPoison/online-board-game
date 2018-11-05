@@ -52,3 +52,29 @@ fn main() {
 fn index(_req: &HttpRequest) -> Result<NamedFile> {
     NamedFile::open("static/index.html").map_err(Into::into)
 }
+
+/// Hashes a value using [`DefaultHasher`].
+///
+/// This is a helper method used primarily to generate hash values from an
+/// [`Addr`]. We use the address of an actor as a unique identifier in a
+/// number of cases (e.g. connected clients are identified solely by their
+/// [`Addr`]), but the default debug log for those addresses don't include
+/// useful identifying information. Hashing the address provides a unique
+/// value that will be the same for all [`Addr`] objects pointing to the same
+/// actor.
+///
+/// At some point it may be worth it to provide this functionality in a more
+/// "automatic" way, either by providing a wrapper type for [`Addr`] that
+/// handles this automatically, or by changing the [`Debug`] impl for [`Addr`]
+/// directly.
+///
+/// [`DefaultHasher`]: https://doc.rust-lang.org/std/collections/hash_map/struct.DefaultHasher.html
+/// [`Addr`]: https://docs.rs/actix/0/actix/struct.Addr.html
+/// [`Debug`]: https://doc.rust-lang.org/std/fmt/trait.Debug.html
+pub(crate) fn default_hash<H>(value: &H) -> u64 where H: std::hash::Hash {
+    use std::hash::Hasher;
+
+    let mut hasher = std::collections::hash_map::DefaultHasher::new();
+    value.hash(&mut hasher);
+    hasher.finish()
+}

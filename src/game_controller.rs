@@ -1,11 +1,11 @@
 use actix::prelude::*;
 use crate::client_controller::*;
 use log::*;
-use std::collections::HashMap;
+use std::collections::HashSet;
 
 #[derive(Debug, Default)]
 pub struct GameController {
-    players: HashMap<usize, Addr<ClientController>>,
+    clients: HashSet<ClientAddr>,
 }
 
 impl GameController {
@@ -19,17 +19,19 @@ impl Actor for GameController {
 }
 
 impl Handler<ClientConnected> for GameController {
-    type Result = usize;
+    type Result = ();
 
-    fn handle(&mut self, message: ClientConnected, ctx: &mut Self::Context) -> Self::Result {
-        debug!("Incoming client message: {:?}", message);
+    fn handle(&mut self, message: ClientConnected, _ctx: &mut Self::Context) -> Self::Result {
+        debug!("Client connected: {:#x}", crate::default_hash(&message.addr));
+        self.clients.insert(message.addr);
+    }
+}
 
-        // TODO: Come up with a better system for generating player IDs.
-        let client_id = self.players.len();
+impl Handler<ClientDisconnected> for GameController {
+    type Result = ();
 
-        debug!("Registering new client with ID {}", client_id);
-        self.players.insert(client_id, message.addr);
-
-        client_id
+    fn handle(&mut self, message: ClientDisconnected, _ctx: &mut Self::Context) -> Self::Result {
+        debug!("Client disconnected: {:#x}", crate::default_hash(&message.addr));
+        self.clients.remove(&message.addr);
     }
 }
