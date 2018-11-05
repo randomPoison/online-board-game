@@ -1,10 +1,29 @@
-let socket = new WebSocket('ws://localhost:8088/ws/');
+window.onload = function (event) {
+    let app = new Vue({
+        el: '#app',
 
-socket.onmessage = function (event) {
-    let payload = JSON.parse(event.data);
-    console.log('Received message:', payload);
-}
+        data: {
+            socket: null,
+            players: [],
+        },
 
-socket.onclose = function (event) {
-    console.log('Disconnected from server:', event);
+        created: function () {
+            this.socket = new WebSocket('ws://localhost:8088/ws/');
+
+            this.socket.onmessage = (event) => {
+                let payload = JSON.parse(event.data);
+                console.log('Received message:', payload);
+
+                // If the payload updates the list of players, apply the update
+                // to the local state.
+                if (payload.players != null) {
+                    this.players = payload.players;
+                }
+            }
+
+            this.socket.onclose = (event) => {
+                console.log('Disconnected from server:', event);
+            }
+        }
+    });
 }
