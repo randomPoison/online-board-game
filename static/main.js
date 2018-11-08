@@ -4,6 +4,7 @@ let app = new Vue({
     data: {
         socket: null,
         players: [],
+        movement: {},
     },
 
     created: function () {
@@ -22,6 +23,17 @@ let app = new Vue({
 
         this.socket.onclose = (event) => {
             console.log('Disconnected from server:', event);
+        }
+    },
+
+    methods: {
+        submitMovement: function () {
+            let payload = {
+                message: 'MoveTo',
+                pos: { x: this.movement.x, y: this.movement.y },
+            };
+            this.socket.send(JSON.stringify(payload));
+            this.movement = {};
         }
     }
 });

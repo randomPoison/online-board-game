@@ -17,6 +17,10 @@
                 <div>health: {{ player.health.current }} / {{ player.health.max }}</div>
                 <div v-if="player.pending_turn.movement != null">pending move: {{ player.pending_turn.movement }}</div>
             </li>
+
+            <input v-model.number="movement.x">
+            <input v-model.number="movement.y">
+            <button v-on:click="submitMovement()">Submit Movement</button>
         </ul>
     </div>
 
