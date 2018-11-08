@@ -1,4 +1,5 @@
-﻿using System;
+﻿using Newtonsoft.Json;
+using System;
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
@@ -22,10 +23,51 @@ public class GameController : MonoBehaviour
         Debug.Log("Websocket connection established!");
 
         // TODO: Wait to receive the initial game state from the server.
+        string initString = null;
+        do
+        {
+            initString = _socket.RecvString();
+        }
+        while (initString == null);
+
+        Debug.LogFormat(this, "Got init string: {0}", initString);
+
+        var initialState = JsonConvert.DeserializeObject<GameStateData>(initString);
+        Debug.LogFormat("Got initial state: {0}", initialState);
     }
 
     private void OnDestroy()
     {
         _socket.Close();
     }
+}
+
+public class GameStateData
+{
+    [JsonProperty("players")]
+    public PlayerData[] Players { get; } = {};
+}
+
+public class PlayerData {
+    [JsonProperty("pos")]
+    public Vector2Int Pos { get; }
+
+    [JsonProperty("health")]
+    public HealthData Health { get; }
+
+    [JsonProperty("pending_turn")]
+    public TurnData PendingTurn { get; }
+}
+
+public class HealthData {
+    [JsonProperty("max")]
+    public int Max { get; }
+
+    [JsonProperty("current")]
+    public int Current { get; }
+}
+
+public class TurnData {
+    [JsonProperty("movement")]
+    public Vector2Int? Movement { get; }
 }
