@@ -1,8 +1,10 @@
 use actix::prelude::*;
 use actix_web::ws::{Message as WebsocketMessage, ProtocolError, WebsocketContext};
+use crate::game::*;
 use crate::game_controller::*;
 use futures::Future;
 use log::*;
+use serde_derive::*;
 
 /// Actor in charge of communicating with a connected client.
 ///
@@ -60,7 +62,26 @@ impl StreamHandler<WebsocketMessage, ProtocolError> for ClientController {
     fn handle(&mut self, message: WebsocketMessage, ctx: &mut Self::Context) {
         match message {
             WebsocketMessage::Text(text) => {
-                unimplemented!("TODO: Handle incoming messages: {:?}", text);
+                let message = match serde_json::from_str(&text) {
+                    Ok(message) => message,
+                    Err(error) => {
+                        warn!("Error parsing message from client: {:?}", error);
+                        return;
+                    }
+                };
+
+                match message {
+                    ClientCommand::MoveTo { pos } => {
+                        let send_future = self.game.send(InputMoveAction {
+                            client: ctx.address(),
+                            pos,
+                        }).then(|result| {
+                            result.expect("Failed to send move command to game controller");
+                            Ok(())
+                        });
+                        Arbiter::spawn(send_future);
+                    }
+                }
             }
 
             WebsocketMessage::Close(reason) => {
@@ -82,9 +103,23 @@ impl Handler<StateUpdate> for ClientController {
     }
 }
 
+/// The valid commands the client can send.
+#[derive(Debug, Deserialize)]
+#[serde(tag = "message")]
+enum ClientCommand {
+    /// Requests that the player controlled by the client move to the specified position.
+    MoveTo { pos: GridPos },
+}
+
 /// Address of a [`ClientController`] actor.
 ///
+/// The address is used to uniquely identify connected clients, no other unique
+/// identifier is generated. As such, the `ClientAddr` is often sent with
+/// messages to the [`GameController`] to identify which client is submitting
+/// a command.
+///
 /// [`ClientController`]: ./struct.ClientController.html
+/// [`GameController`]: ../game_controller/struct.GameController.html
 pub type ClientAddr = Addr<ClientController>;
 
 /// Message sent to the [`GameController`] when a client first connects.
@@ -101,4 +136,13 @@ pub struct ClientConnected {
 #[derive(Debug, Message)]
 pub struct ClientDisconnected {
     pub addr: Addr<ClientController>,
+}
+
+/// Message sent to the [`GameController`] when a client inputs a move action.
+///
+/// [`GameController`]: ../game_controller/struct.GameController.html
+#[derive(Debug, Message)]
+pub struct InputMoveAction {
+    pub client: ClientAddr,
+    pub pos: GridPos,
 }

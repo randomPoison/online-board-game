@@ -1,3 +1,5 @@
+//! State and logic for the game itself.
+
 use serde_derive::*;
 
 /// Grid position of an entity in the world.
@@ -21,8 +23,24 @@ pub struct Health {
 }
 
 /// Entity representing a player in the game.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize)]
 pub struct Player {
     pub pos: GridPos,
     pub health: Health,
+
+    /// The steps that the player has planned out for their next turn.
+    pub pending_turn: PlayerTurn,
 }
+
+/// The actions a player will take in their next turn.
+///
+/// A player's turn happens in two parts: First a move action, followed by
+/// as many non-move actions as they choose to make.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Hash, Serialize)]
+pub struct PlayerTurn {
+    pub movement: Option<GridPos>,
+    pub actions: Vec<PlayerAction>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize)]
+pub struct PlayerAction;

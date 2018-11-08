@@ -4,7 +4,7 @@ use crate::game::*;
 use futures::Future;
 use log::*;
 use serde_derive::*;
-use std::collections::HashSet;
+use std::collections::HashMap;
 
 /// Main actor in charge of managing and updating the game state.
 ///
@@ -13,15 +13,31 @@ use std::collections::HashSet;
 /// broadcasting updated information in turn.
 #[derive(Debug, Default)]
 pub struct GameController {
-    clients: HashSet<ClientAddr>,
+    /// Maps the client to the index of the player it controls.
+    clients: HashMap<ClientAddr, usize>,
 
-    // Game state objects.
+    /// State data for all the players in the game.
     players: Vec<Player>,
 }
 
 impl GameController {
     pub fn new() -> Self {
         Default::default()
+    }
+
+    /// Broadcasts the full game state to all connected clients.
+    fn broadcast_game_state(&self) {
+        for client in self.clients.keys() {
+            let send_future = client
+                .send(StateUpdate {
+                    players: self.players.clone(),
+                }).then(|result| {
+                    result.expect("Failed to send state update to client");
+                    Ok(())
+                });
+
+            Arbiter::spawn(send_future);
+        }
     }
 }
 
@@ -40,7 +56,7 @@ impl Handler<ClientConnected> for GameController {
 
         // Track the connected clients so that we can broadcast state updates
         // out to them.
-        self.clients.insert(message.addr);
+        self.clients.insert(message.addr, self.players.len());
 
         // Add a player corresponding to the new client.
         //
@@ -61,20 +77,11 @@ impl Handler<ClientConnected> for GameController {
                 max: 10,
                 current: 10,
             },
+            pending_turn: Default::default(),
         });
 
         // Broadcast the updated game state to all connected clients.
-        for client in &self.clients {
-            let send_future = client
-                .send(StateUpdate {
-                    players: self.players.clone(),
-                }).then(|result| {
-                    result.expect("Failed to send state update to client");
-                    Ok(())
-                });
-
-            Arbiter::spawn(send_future);
-        }
+        self.broadcast_game_state();
     }
 }
 
@@ -87,6 +94,35 @@ impl Handler<ClientDisconnected> for GameController {
             crate::default_hash(&message.addr)
         );
         self.clients.remove(&message.addr);
+    }
+}
+
+impl Handler<InputMoveAction> for GameController {
+    type Result = ();
+
+    fn handle(&mut self, message: InputMoveAction, ctx: &mut Self::Context) -> Self::Result {
+        debug!(
+            "Moving client {:#x} to {:?}",
+            crate::default_hash(&message.client),
+            message.pos,
+        );
+
+        // TODO: Lookup the player controlled by the client and update them?
+        let &player_index = self
+            .clients
+            .get(&message.client)
+            .expect("No such client found");
+
+        // HACK: Create an explicit scope for the borrow on `self.players` since we also
+        // end up borrowing `self` when broadcasting the game state update. This can
+        // be fixed once NLLs are stable.
+        {
+            let player = &mut self.players[player_index];
+            player.pending_turn.movement = Some(message.pos);
+        }
+
+        // Broadcast the updated game state to all connected clients.
+        self.broadcast_game_state();
     }
 }
 
