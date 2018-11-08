@@ -35,5 +35,5 @@ let app = new Vue({
             this.socket.send(JSON.stringify(payload));
             this.movement = {};
         }
-    }
+    },
 });
