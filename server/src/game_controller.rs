@@ -66,9 +66,15 @@ impl Handler<ClientConnected> for GameController {
         //
         // TODO: Set a cap on how many players can be in the game at a time.
         let player_index = match self.unassigned_players.pop() {
-            Some(player_index) => player_index,
+            Some(player_index) => {
+                info!("Assigning existing player {} to connected client", player_index);
+                player_index
+            }
 
             None => {
+                let player_index = self.players.len();
+                info!("Creating player {} for connected client", player_index);
+
                 // Add a player corresponding to the new client.
                 //
                 // TODO: Handle a new client taking control of an existing player. This is something
@@ -79,7 +85,7 @@ impl Handler<ClientConnected> for GameController {
                 // we start them at (num_players, 0), which doesn't account for the total size of
                 // the grid or give us any control over initial player positions.
                 let pos = GridPos {
-                    x: self.players.len(),
+                    x: player_index,
                     y: 0,
                 };
                 self.players.push(Player {
@@ -91,7 +97,7 @@ impl Handler<ClientConnected> for GameController {
                     pending_turn: Default::default(),
                 });
 
-                self.players.len() - 1
+                player_index
             }
         };
 
@@ -132,19 +138,13 @@ impl Handler<InputMoveAction> for GameController {
             message.pos,
         );
 
-        // TODO: Lookup the player controlled by the client and update them?
+        // Update the move action for the player controlled by the client that sent
+        // the message.
         let &player_index = self
             .clients
             .get(&message.client)
             .expect("No such client found");
-
-        // HACK: Create an explicit scope for the borrow on `self.players` since we also
-        // end up borrowing `self` when broadcasting the game state update. This can
-        // be fixed once NLLs are stable.
-        {
-            let player = &mut self.players[player_index];
-            player.pending_turn.movement = Some(message.pos);
-        }
+        self.players[player_index].pending_turn.movement = Some(message.pos);
 
         // Broadcast the updated game state to all connected clients.
         self.broadcast_game_state();
