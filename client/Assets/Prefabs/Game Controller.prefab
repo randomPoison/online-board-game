@@ -45,3 +45,5 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   _playerPrefab: {fileID: 4851903086192906126, guid: 070b159322e6ef24c922e1a436dc2fa3,
     type: 3}
+  _playerMovementPreviewPrefab: {fileID: 4851903086192906126, guid: 32cb9a03c110aec4ca55f975600c1aa4,
+    type: 3}

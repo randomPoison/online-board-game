@@ -10,6 +10,9 @@ public class GameController : MonoBehaviour
     [SerializeField]
     private GameObject _playerPrefab = null;
 
+    [SerializeField]
+    private GameObject _playerMovementPreviewPrefab = null;
+
     private WebSocket _socket;
 
     private IEnumerator Start()
@@ -43,12 +46,21 @@ public class GameController : MonoBehaviour
         // TODO: Handle serialization errors.
         var state = JsonConvert.DeserializeObject<GameStateData>(initString);
 
-        // Create a player instance in the scene for each of the players that already exists
-        // when we connect to the server.
+        // Create objects in the world as necessary based on the initial game state
+        // when we first connect to the server.
         foreach (var player in state.Players)
         {
+            // Create an object in the world for the player and set it to the world position
+            // that corresponds to their grid position.
             var playerInstance = Instantiate(_playerPrefab);
             playerInstance.transform.localPosition = player.Pos.WorldPos;
+
+            // Visualize the pending move action for the player, if they already have
+            // one setup.
+            if (player.PendingTurn.Movement.HasValue) {
+                var movementPreview = Instantiate(_playerMovementPreviewPrefab);
+                movementPreview.transform.localPosition = player.PendingTurn.Movement.Value.WorldPos;
+            }
         }
     }
 
