@@ -16,6 +16,12 @@ pub struct GameController {
     /// Maps the client to the index of the player it controls.
     clients: HashMap<ClientAddr, usize>,
 
+    /// List of players that are not currently assigned to a connected client.
+    ///
+    /// When a new client connects to the game, they will be given control of
+    /// an existing player before a new player is created.
+    unassigned_players: Vec<usize>,
+
     /// State data for all the players in the game.
     players: Vec<Player>,
 }
@@ -54,31 +60,43 @@ impl Handler<ClientConnected> for GameController {
             crate::default_hash(&message.addr)
         );
 
-        // Track the connected clients so that we can broadcast state updates
-        // out to them.
-        self.clients.insert(message.addr, self.players.len());
+        // Check if there are any players that are not currently being controlled by
+        // a client. If so, assign the new client to control one of the available
+        // players. Otherwise, create a new player for the client.
+        //
+        // TODO: Set a cap on how many players can be in the game at a time.
+        let player_index = match self.unassigned_players.pop() {
+            Some(player_index) => player_index,
 
-        // Add a player corresponding to the new client.
-        //
-        // TODO: Handle a new client taking control of an existing player. This is something
-        // we'll want to do if a client disconnects and then reconnects, rather than creating
-        // a new player each time a new client connects.
-        //
-        // TODO: Use a better system for setting the initial position of players. Currently
-        // we start them at (num_players, 0), which doesn't account for the total size of
-        // the grid or give us any control over initial player positions.
-        let pos = GridPos {
-            x: self.players.len(),
-            y: 0,
+            None => {
+                // Add a player corresponding to the new client.
+                //
+                // TODO: Handle a new client taking control of an existing player. This is something
+                // we'll want to do if a client disconnects and then reconnects, rather than creating
+                // a new player each time a new client connects.
+                //
+                // TODO: Use a better system for setting the initial position of players. Currently
+                // we start them at (num_players, 0), which doesn't account for the total size of
+                // the grid or give us any control over initial player positions.
+                let pos = GridPos {
+                    x: self.players.len(),
+                    y: 0,
+                };
+                self.players.push(Player {
+                    pos,
+                    health: Health {
+                        max: 10,
+                        current: 10,
+                    },
+                    pending_turn: Default::default(),
+                });
+
+                self.players.len() - 1
+            }
         };
-        self.players.push(Player {
-            pos,
-            health: Health {
-                max: 10,
-                current: 10,
-            },
-            pending_turn: Default::default(),
-        });
+
+        // Track which player the client currently controls.
+        self.clients.insert(message.addr, player_index);
 
         // Broadcast the updated game state to all connected clients.
         self.broadcast_game_state();
@@ -93,14 +111,21 @@ impl Handler<ClientDisconnected> for GameController {
             "Client disconnected: {:#x}",
             crate::default_hash(&message.addr)
         );
-        self.clients.remove(&message.addr);
+        let player_index = match self.clients.remove(&message.addr) {
+            Some(index) => index,
+            None => {
+                warn!("Disconnected client was not assigned to a player");
+                return;
+            }
+        };
+        self.unassigned_players.push(player_index);
     }
 }
 
 impl Handler<InputMoveAction> for GameController {
     type Result = ();
 
-    fn handle(&mut self, message: InputMoveAction, ctx: &mut Self::Context) -> Self::Result {
+    fn handle(&mut self, message: InputMoveAction, _ctx: &mut Self::Context) -> Self::Result {
         debug!(
             "Moving client {:#x} to {:?}",
             crate::default_hash(&message.client),
