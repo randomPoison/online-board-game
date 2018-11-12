@@ -12,7 +12,7 @@ public class GameController : MonoBehaviour
 
     private WebSocket _socket;
 
-    public IEnumerator Start()
+    private IEnumerator Start()
     {
         Debug.Assert(_playerPrefab != null, "Player prefab wasn't setup");
 
@@ -41,16 +41,14 @@ public class GameController : MonoBehaviour
         Debug.LogFormat(this, "Got init string: {0}", initString);
 
         // TODO: Handle serialization errors.
-        var initialState = JsonConvert.DeserializeObject<GameStateData>(initString);
-        Debug.LogFormat(this, "Got initial state: {0} players connected", initialState.Players.Count);
+        var state = JsonConvert.DeserializeObject<GameStateData>(initString);
 
         // Create a player instance in the scene for each of the players that already exists
         // when we connect to the server.
-        foreach (var player in initialState.Players)
+        foreach (var player in state.Players)
         {
             var playerInstance = Instantiate(_playerPrefab);
-            // playerInstance.transform.localPosition = (Vector2)player.Pos;
-            Debug.LogFormat(this, "Player health: {0}", player.Health.Current);
+            playerInstance.transform.localPosition = player.Pos.WorldPos;
         }
     }
 

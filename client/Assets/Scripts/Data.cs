@@ -12,7 +12,7 @@ public class GameStateData
 public class PlayerData
 {
     [JsonProperty("pos")]
-    public Vector2Int Pos { get; private set; }
+    public GridPos Pos { get; private set; }
 
     [JsonProperty("health")]
     public HealthData Health { get; private set; }
@@ -33,5 +33,17 @@ public class HealthData
 public class TurnData
 {
     [JsonProperty("movement")]
-    public Vector2Int? Movement { get; private set; }
+    public GridPos? Movement { get; private set; }
+}
+
+public struct GridPos
+{
+    public int x;
+
+    public int y;
+
+    public Vector3Int WorldPos
+    {
+        get { return new Vector3Int(x, 0, y); }
+    }
 }
