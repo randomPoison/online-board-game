@@ -80,7 +80,7 @@ public class WebSocket
 		while (SocketState(m_NativeRef) == 0)
 			yield return 0;
 	}
- 
+
 	public void Close()
 	{
 		SocketClose(m_NativeRef);
@@ -96,7 +96,7 @@ public class WebSocket
 			if (result == 0)
 				return null;
 
-			return Encoding.UTF8.GetString (buffer);				
+			return Encoding.UTF8.GetString (buffer);
 		}
 	}
 #else
@@ -130,7 +130,7 @@ public class WebSocket
 
 	public void Close()
 	{
-		m_Socket.Close();
+		m_Socket.CloseAsync();
 	}
 
 	public string error
@@ -139,5 +139,5 @@ public class WebSocket
 			return m_Error;
 		}
 	}
-#endif 
+#endif
 }
