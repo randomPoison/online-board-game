@@ -1,4 +1,5 @@
 ﻿using Newtonsoft.Json;
+using Newtonsoft.Json.Serialization;
 using System;
 using System.Collections;
 using System.Collections.Generic;
@@ -6,10 +7,15 @@ using UnityEngine;
 
 public class GameController : MonoBehaviour
 {
+    [SerializeField]
+    private GameObject _playerPrefab = null;
+
     private WebSocket _socket;
 
     public IEnumerator Start()
     {
+        Debug.Assert(_playerPrefab != null, "Player prefab wasn't setup");
+
         _socket = new WebSocket(new Uri("ws://localhost:8088/ws/"));
         yield return _socket.Connect();
         if (!string.IsNullOrEmpty(_socket.error))
@@ -22,52 +28,34 @@ public class GameController : MonoBehaviour
 
         Debug.Log("Websocket connection established!");
 
-        // TODO: Wait to receive the initial game state from the server.
-        string initString = null;
-        do
+        // Wait to receive the initial game state from the server.
+        var initString = _socket.RecvString();
+        while (initString == null)
         {
+            // Wait a frame before checking again.
+            yield return null;
+
             initString = _socket.RecvString();
         }
-        while (initString == null);
 
         Debug.LogFormat(this, "Got init string: {0}", initString);
 
+        // TODO: Handle serialization errors.
         var initialState = JsonConvert.DeserializeObject<GameStateData>(initString);
-        Debug.LogFormat("Got initial state: {0}", initialState);
+        Debug.LogFormat(this, "Got initial state: {0} players connected", initialState.Players.Count);
+
+        // Create a player instance in the scene for each of the players that already exists
+        // when we connect to the server.
+        foreach (var player in initialState.Players)
+        {
+            var playerInstance = Instantiate(_playerPrefab);
+            // playerInstance.transform.localPosition = (Vector2)player.Pos;
+            Debug.LogFormat(this, "Player health: {0}", player.Health.Current);
+        }
     }
 
     private void OnDestroy()
     {
         _socket.Close();
     }
-}
-
-public class GameStateData
-{
-    [JsonProperty("players")]
-    public PlayerData[] Players { get; } = {};
-}
-
-public class PlayerData {
-    [JsonProperty("pos")]
-    public Vector2Int Pos { get; }
-
-    [JsonProperty("health")]
-    public HealthData Health { get; }
-
-    [JsonProperty("pending_turn")]
-    public TurnData PendingTurn { get; }
-}
-
-public class HealthData {
-    [JsonProperty("max")]
-    public int Max { get; }
-
-    [JsonProperty("current")]
-    public int Current { get; }
-}
-
-public class TurnData {
-    [JsonProperty("movement")]
-    public Vector2Int? Movement { get; }
 }
