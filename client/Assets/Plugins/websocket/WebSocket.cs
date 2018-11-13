@@ -7,31 +7,20 @@ using System.Text;
 using System.Collections;
 using UnityEngine;
 using System.Runtime.InteropServices;
+using System.Threading.Tasks;
 
 public class WebSocket
 {
-	private Uri mUrl;
-
-	public WebSocket(Uri url)
-	{
-		mUrl = url;
-
-		string protocol = mUrl.Scheme;
-		if (!protocol.Equals("ws") && !protocol.Equals("wss"))
-			throw new ArgumentException("Unsupported protocol: " + protocol);
-	}
+	private Uri _url;
 
 	public void SendString(string str)
 	{
 		Send(Encoding.UTF8.GetBytes (str));
 	}
 
-	public string RecvString()
-	{
-		byte[] retval = Recv();
-		if (retval == null)
-			return null;
-		return Encoding.UTF8.GetString (retval);
+	public async Task<string> RecvStringAsync() {
+		var bytes = await RecvAsync();
+		return Encoding.UTF8.GetString(bytes);
 	}
 
 #if UNITY_WEBGL && !UNITY_EDITOR
@@ -100,44 +89,137 @@ public class WebSocket
 		}
 	}
 #else
-	WebSocketSharp.WebSocket m_Socket;
-	Queue<byte[]> m_Messages = new Queue<byte[]>();
-	bool m_IsConnected = false;
-	string m_Error = null;
+	WebSocketSharp.WebSocket _socket;
 
-	public IEnumerator Connect()
-	{
-		m_Socket = new WebSocketSharp.WebSocket(mUrl.ToString());
-		m_Socket.OnMessage += (sender, e) => m_Messages.Enqueue (e.RawData);
-		m_Socket.OnOpen += (sender, e) => m_IsConnected = true;
-		m_Socket.OnError += (sender, e) => m_Error = e.Message;
-		m_Socket.ConnectAsync();
-		while (!m_IsConnected && m_Error == null)
-			yield return 0;
+	// Queues for tracking pending tasks (i.e. tasks for code that is awaiting a message) and
+	// recieved messages that haven't been dispatched.
+	Queue<TaskCompletionSource<byte[]>> _pendingTasks = new Queue<TaskCompletionSource<byte[]>>();
+	Queue<byte[]> _pendingMessages = new Queue<byte[]>();
+
+	bool _isConnected = false;
+
+	private WebSocket(Uri url, WebSocketSharp.WebSocket socket) {
+		_url = url;
+		_socket = socket;
+		_isConnected = true;
+
+		// Register the listeners for incoming messages/errors.
+		_socket.OnMessage += OnMessage;
+		_socket.OnError += OnError;
+	}
+
+	/// <summary>
+	/// Attempts to create a web socket connected to <paramref name="url"/>, returning the socket
+	/// once the connection was successfully establish. Throws an exception if the connection
+	/// fails.
+	/// </summary>
+	///
+	/// <param name="url">The endpoint to connect to.</param>
+	///
+	/// <returns>The web socket once the connection has been established.</returns>
+	///
+	/// <exception cref="WebSocketException">
+	/// Throws an exception if the connection fails or if an error occurs before the connection
+	/// can be established.
+	/// </exception>
+	public static Task<WebSocket> ConnectAsync(Uri url) {
+		var protocol = url.Scheme;
+		if (protocol != "ws" && protocol != "wss")
+		{
+			throw new ArgumentException("Unsupported protocol: " + protocol);
+		}
+
+		// Create a completion source so that we can return the finished web socket
+		// asynchronously.
+		var completion = new TaskCompletionSource<WebSocket>();
+
+		// Create the underlying socket and setup callbacks to either yield the connected
+		// WebSocket or return an error if the connection fails.
+		var socket = new WebSocketSharp.WebSocket(url.ToString());
+		socket.OnOpen += (sender, e) => {
+			completion.TrySetResult(new WebSocket(url, socket));
+		};
+		socket.OnError += (sender, args) => {
+			completion.TrySetException(new WebSocketException(args.Message));
+		};
+
+		// Begin the connection and return the task.
+		socket.ConnectAsync();
+		return completion.Task;
 	}
 
 	public void Send(byte[] buffer)
 	{
-		m_Socket.Send(buffer);
+		_socket.Send(buffer);
 	}
 
-	public byte[] Recv()
+	/// <summary>
+	/// Returns the next message received on the socket as a byte array.
+	/// </summary>
+	///
+	/// <returns>The next message recieved on the socket.</returns>
+	///
+	/// <exception cref="WebSocketException">
+	/// Throws an exception if an error occurs while waiting for an incoming message,
+	/// or if the socket disconnects.
+	/// </exception>
+	///
+	/// <remarks>
+	/// This method guarantees that each incoming message will only be yielded once,
+	/// and that messages will be yielded in the order they are received. It is
+	/// therefor safe to call this method multiple times without waiting for each to
+	/// task to resolve.
+	/// </remarks>
+	public Task<byte[]> RecvAsync()
 	{
-		if (m_Messages.Count == 0)
-			return null;
-		return m_Messages.Dequeue();
+		// If we've already received a message that hasn't been dispatched, immediately resolve
+		// the task with the first message in the queue. Otherwise, create a TaskCompletionSource
+		// so that we can resolve the task with the next message we receive.
+		if (_pendingMessages.Count > 0)
+		{
+			return Task.FromResult(_pendingMessages.Dequeue());
+		}
+		else
+		{
+			var completion = new TaskCompletionSource<byte[]>();
+			_pendingTasks.Enqueue(completion);
+			return completion.Task;
+		}
 	}
+
+	private void OnMessage(object sender, WebSocketSharp.MessageEventArgs args)
+	{
+		if (_pendingTasks.Count > 0) {
+			var completion = _pendingTasks.Dequeue();
+			completion.TrySetResult(args.RawData);
+		} else {
+			_pendingMessages.Enqueue(args.RawData);
+		}
+	}
+
+	private void OnError(object sender, WebSocketSharp.ErrorEventArgs args)
+	{
+		// Have all pending tasks fail when an error occurs.
+		//
+		// TODO: Is there a better way to handle this? Maybe only fail the first pending task?
+		// We should either switch to a better approach, or explain why this approach is ideal.
+		foreach (var completion in _pendingTasks)
+		{
+			completion.TrySetException(new WebSocketException(args.Message));
+		}
+		_pendingTasks.Clear();
+	}
+
 
 	public void Close()
 	{
-		m_Socket.CloseAsync();
-	}
-
-	public string error
-	{
-		get {
-			return m_Error;
-		}
+		_socket.CloseAsync();
 	}
 #endif
+}
+
+public class WebSocketException : Exception {
+	public WebSocketException() { }
+
+	public WebSocketException(string message) : base(message) { }
 }
