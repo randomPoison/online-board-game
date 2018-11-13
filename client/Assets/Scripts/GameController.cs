@@ -3,15 +3,20 @@ using Newtonsoft.Json.Serialization;
 using System;
 using System.Collections;
 using System.Collections.Generic;
+using System.Runtime.CompilerServices;
 using UnityEngine;
+using UnityEngine.AddressableAssets;
+using UnityEngine.ResourceManagement;
+using UniRx.Async;
+using static UniRx.Async.UnityAsyncExtensions;
 
 public class GameController : MonoBehaviour
 {
     [SerializeField]
-    private GameObject _playerPrefab = null;
+    private AssetReference _playerPrefab = null;
 
     [SerializeField]
-    private GameObject _playerMovementPreviewPrefab = null;
+    private AssetReference _playerMovementPreviewPrefab = null;
 
     private WebSocket _socket;
 
@@ -37,13 +42,13 @@ public class GameController : MonoBehaviour
         {
             // Create an object in the world for the player and set it to the world position
             // that corresponds to their grid position.
-            var playerInstance = Instantiate(_playerPrefab);
+            var playerInstance = await Addressables.Instantiate<GameObject>(_playerPrefab);
             playerInstance.transform.localPosition = player.Pos.WorldPos;
 
             // Visualize the pending move action for the player, if they already have
             // one setup.
             if (player.PendingTurn.Movement.HasValue) {
-                var movementPreview = Instantiate(_playerMovementPreviewPrefab);
+                var movementPreview = await Addressables.Instantiate<GameObject>(_playerMovementPreviewPrefab);
                 movementPreview.transform.localPosition = player.PendingTurn.Movement.Value.WorldPos;
             }
         }
