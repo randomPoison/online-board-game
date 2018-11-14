@@ -31,16 +31,18 @@ impl GameController {
         Default::default()
     }
 
-    /// Broadcasts the full game state to all connected clients.
-    fn broadcast_game_state(&self) {
+    /// Broadcasts a message to all connected clients.
+    fn broadcast<M>(&self, message: M)
+    where
+        M: 'static + Message + Clone + Send,
+        M::Result: Send,
+        ClientController: Handler<M>,
+    {
         for client in self.clients.keys() {
-            let send_future = client
-                .send(StateUpdate {
-                    players: self.players.clone(),
-                }).then(|result| {
-                    result.expect("Failed to send state update to client");
-                    Ok(())
-                });
+            let send_future = client.send(message.clone()).then(|result| {
+                result.expect("Failed to send state update to client");
+                Ok(())
+            });
 
             Arbiter::spawn(send_future);
         }
@@ -67,7 +69,10 @@ impl Handler<ClientConnected> for GameController {
         // TODO: Set a cap on how many players can be in the game at a time.
         let player_index = match self.unassigned_players.pop() {
             Some(player_index) => {
-                info!("Assigning existing player {} to connected client", player_index);
+                info!(
+                    "Assigning existing player {} to connected client",
+                    player_index
+                );
                 player_index
             }
 
@@ -105,7 +110,9 @@ impl Handler<ClientConnected> for GameController {
         self.clients.insert(message.addr, player_index);
 
         // Broadcast the updated game state to all connected clients.
-        self.broadcast_game_state();
+        self.broadcast(WorldState {
+            players: self.players.clone(),
+        });
     }
 }
 
@@ -147,7 +154,9 @@ impl Handler<InputMoveAction> for GameController {
         self.players[player_index].pending_turn.movement = Some(message.pos);
 
         // Broadcast the updated game state to all connected clients.
-        self.broadcast_game_state();
+        self.broadcast(WorldState {
+            players: self.players.clone(),
+        });
     }
 }
 
@@ -155,7 +164,7 @@ impl Handler<InputMoveAction> for GameController {
 ///
 /// This message is sent whenever the game's state has changed in order to
 /// notify connected clients of the new state.
-#[derive(Debug, Message, Serialize)]
-pub struct StateUpdate {
+#[derive(Debug, Clone, Message, Serialize)]
+pub struct WorldState {
     players: Vec<Player>,
 }

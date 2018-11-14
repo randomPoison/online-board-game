@@ -94,10 +94,10 @@ impl StreamHandler<WebsocketMessage, ProtocolError> for ClientController {
     }
 }
 
-impl Handler<StateUpdate> for ClientController {
+impl Handler<WorldState> for ClientController {
     type Result = ();
 
-    fn handle(&mut self, message: StateUpdate, ctx: &mut Self::Context) -> Self::Result {
+    fn handle(&mut self, message: WorldState, ctx: &mut Self::Context) -> Self::Result {
         let json = serde_json::to_string(&message).expect("Failed to serialize state update");
         ctx.text(json);
     }
