@@ -24,13 +24,13 @@ public class GameController : MonoBehaviour
     {
         Debug.Assert(_playerPrefab != null, "Player prefab wasn't setup");
 
-		// TODO: Handle an exception being thrown as a result of the connection failing.
+        // TODO: Handle an exception being thrown as a result of the connection failing.
         _socket = await WebSocket.ConnectAsync(new Uri("ws://localhost:8088/ws/"));
 
-		// Wait for the initial game state to come in from the server.
-		//
-		// TODO: Handle an exception being thrown while waiting (i.e. if we disconnect).
-		var initString = await _socket.RecvStringAsync();
+        // Wait for the initial game state to come in from the server.
+        //
+        // TODO: Handle an exception being thrown while waiting (i.e. if we disconnect).
+        var initString = await _socket.RecvStringAsync();
         Debug.LogFormat(this, "Got init string: {0}", initString);
 
         // TODO: Handle serialization errors.
@@ -47,7 +47,8 @@ public class GameController : MonoBehaviour
 
             // Visualize the pending move action for the player, if they already have
             // one setup.
-            if (player.PendingTurn.Movement.HasValue) {
+            if (player.PendingTurn.Movement.HasValue)
+            {
                 var movementPreview = await Addressables.Instantiate<GameObject>(_playerMovementPreviewPrefab);
                 movementPreview.transform.localPosition = player.PendingTurn.Movement.Value.WorldPos;
             }
