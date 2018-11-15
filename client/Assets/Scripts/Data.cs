@@ -1,11 +1,12 @@
 using System.Collections.Generic;
 using Newtonsoft.Json;
+using Newtonsoft.Json.Converters;
+using Newtonsoft.Json.Linq;
 using UnityEngine;
 
 public class GameStateData
 {
     [JsonProperty("players")]
-    [JsonRequired]
     public List<PlayerData> Players { get; private set; }
 }
 
@@ -46,4 +47,38 @@ public struct GridPos
     {
         get { return new Vector3Int(x, 0, y); }
     }
+}
+
+public struct Message
+{
+    [JsonProperty("type")]
+    public readonly MessageType Type;
+
+    [JsonProperty("data")]
+    public readonly JObject Data;
+}
+
+[JsonConverter(typeof(StringEnumConverter))]
+public enum MessageType
+{
+    PlayerAdded,
+    SetMovement,
+}
+
+public struct PlayerAdded
+{
+    [JsonProperty("index")]
+    public readonly int Index;
+
+    [JsonProperty("data")]
+    public readonly PlayerData Data;
+}
+
+public struct SetMovement
+{
+    [JsonProperty("index")]
+    public readonly int Index;
+
+    [JsonProperty("pos")]
+    public readonly GridPos Pos;
 }

@@ -30,11 +30,8 @@ public class GameController : MonoBehaviour
         // Wait for the initial game state to come in from the server.
         //
         // TODO: Handle an exception being thrown while waiting (i.e. if we disconnect).
-        var initString = await _socket.RecvStringAsync();
-        Debug.LogFormat(this, "Got init string: {0}", initString);
-
         // TODO: Handle serialization errors.
-        var state = JsonConvert.DeserializeObject<GameStateData>(initString);
+        var state = await _socket.RecvMessageAsync<GameStateData>();
 
         // Create objects in the world as necessary based on the initial game state
         // when we first connect to the server.
@@ -51,6 +48,25 @@ public class GameController : MonoBehaviour
             {
                 var movementPreview = await Addressables.Instantiate<GameObject>(_playerMovementPreviewPrefab);
                 movementPreview.transform.localPosition = player.PendingTurn.Movement.Value.WorldPos;
+            }
+        }
+
+        while (true)
+        {
+            // TODO: Handle an exception being thrown while waiting (i.e. if we disconnect).
+            // TODO: Handle serialization errors.
+            var update = await _socket.RecvMessageAsync<Message>();
+            switch (update.Type)
+            {
+                case MessageType.PlayerAdded:
+                    var playerAdded = update.Data.ToObject<PlayerAdded>();
+                    // TODO: Add the player to the local world.
+                    break;
+
+                case MessageType.SetMovement:
+                    var setMovement = update.Data.ToObject<SetMovement>();
+                    // TODO: Update the movement preview for the specified player.
+                    break;
             }
         }
     }
