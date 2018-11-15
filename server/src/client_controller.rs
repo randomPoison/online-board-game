@@ -1,3 +1,4 @@
+use actix::fut::IntoActorFuture;
 use actix::prelude::*;
 use actix_web::ws::{Message as WebsocketMessage, ProtocolError, WebsocketContext};
 use crate::game::*;
@@ -37,12 +38,17 @@ impl Actor for ClientController {
             .game
             .send(ClientConnected {
                 addr: ctx.address(),
-            }).then(|result| {
-                result.expect("Error sending client ID to client controller");
-                Ok(())
+            })
+            .into_actor(self)
+            .and_then(|world_state, _actor, ctx| {
+                let json = serde_json::to_string(&world_state).expect("Failed to serialize state update");
+                ctx.text(json);
+                actix::fut::ok(())
+            }).map_err(|error, _actor, _ctx| {
+                panic!("{:?}", error);
             });
 
-        Arbiter::spawn(send_future);
+        ctx.spawn(send_future);
     }
 
     fn stopped(&mut self, ctx: &mut Self::Context) {
@@ -94,10 +100,10 @@ impl StreamHandler<WebsocketMessage, ProtocolError> for ClientController {
     }
 }
 
-impl Handler<WorldState> for ClientController {
+impl Handler<Update> for ClientController {
     type Result = ();
 
-    fn handle(&mut self, message: WorldState, ctx: &mut Self::Context) -> Self::Result {
+    fn handle(&mut self, message: Update, ctx: &mut Self::Context) -> Self::Result {
         let json = serde_json::to_string(&message).expect("Failed to serialize state update");
         ctx.text(json);
     }
@@ -125,9 +131,13 @@ pub type ClientAddr = Addr<ClientController>;
 /// Message sent to the [`GameController`] when a client first connects.
 ///
 /// [`GameController`]: ../game_controller/struct.GameController.html
-#[derive(Debug, Message)]
+#[derive(Debug)]
 pub struct ClientConnected {
     pub addr: Addr<ClientController>,
+}
+
+impl Message for ClientConnected {
+    type Result = WorldState;
 }
 
 /// Message sent to the [`GameController`] when a client disconnects.

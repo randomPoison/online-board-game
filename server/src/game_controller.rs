@@ -54,7 +54,7 @@ impl Actor for GameController {
 }
 
 impl Handler<ClientConnected> for GameController {
-    type Result = ();
+    type Result = WorldState;
 
     fn handle(&mut self, message: ClientConnected, _ctx: &mut Self::Context) -> Self::Result {
         debug!(
@@ -110,9 +110,15 @@ impl Handler<ClientConnected> for GameController {
         self.clients.insert(message.addr, player_index);
 
         // Broadcast the updated game state to all connected clients.
-        self.broadcast(WorldState {
-            players: self.players.clone(),
+        self.broadcast(Update::PlayerAdded {
+            index: player_index,
+            data: self.players[player_index].clone(),
         });
+
+        // Return the current world state to the new client.
+        WorldState {
+            players: self.players.clone(),
+        }
     }
 }
 
@@ -154,8 +160,9 @@ impl Handler<InputMoveAction> for GameController {
         self.players[player_index].pending_turn.movement = Some(message.pos);
 
         // Broadcast the updated game state to all connected clients.
-        self.broadcast(WorldState {
-            players: self.players.clone(),
+        self.broadcast(Update::SetMovement {
+            index: player_index,
+            pos: message.pos,
         });
     }
 }
@@ -164,7 +171,39 @@ impl Handler<InputMoveAction> for GameController {
 ///
 /// This message is sent whenever the game's state has changed in order to
 /// notify connected clients of the new state.
-#[derive(Debug, Clone, Message, Serialize)]
+#[derive(Debug, Clone, Serialize)]
 pub struct WorldState {
     players: Vec<Player>,
+}
+
+impl<A, M> actix::dev::MessageResponse<A, M> for WorldState
+where
+    A: Actor,
+    M: Message<Result = WorldState>,
+{
+    fn handle<R: actix::dev::ResponseChannel<M>>(self, _: &mut A::Context, tx: Option<R>) {
+        if let Some(tx) = tx {
+            tx.send(self);
+        }
+    }
+}
+
+/// An update to the game state.
+///
+/// Updates to the game state are delta-encoded, sending only the changes
+/// resulting from each action and user input. This minimizes the amount of
+/// data that needs to be sent to the clients when the game state changes.
+#[derive(Debug, Clone, Message, Serialize)]
+pub enum Update {
+    /// A new player was added to the board.
+    PlayerAdded {
+        index: usize,
+        data: Player,
+    },
+
+    /// A player set their move action for the current turn.
+    SetMovement {
+        index: usize,
+        pos: GridPos,
+    },
 }
