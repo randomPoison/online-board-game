@@ -8,7 +8,6 @@ using UnityEngine;
 using UnityEngine.AddressableAssets;
 using UnityEngine.ResourceManagement;
 using UniRx.Async;
-using static UniRx.Async.UnityAsyncExtensions;
 
 public class GameController : MonoBehaviour
 {
@@ -32,6 +31,8 @@ public class GameController : MonoBehaviour
         // TODO: Handle an exception being thrown while waiting (i.e. if we disconnect).
         // TODO: Handle serialization errors.
         var state = await _socket.RecvMessageAsync<GameStateData>();
+        Debug.LogFormat("Recieved initial state: {0}", state);
+        Debug.LogFormat("Received initial state with {0} players", state.Players.Count);
 
         // Create objects in the world as necessary based on the initial game state
         // when we first connect to the server.

@@ -106,14 +106,19 @@ impl Handler<ClientConnected> for GameController {
             }
         };
 
-        // Track which player the client currently controls.
-        self.clients.insert(message.addr, player_index);
 
         // Broadcast the updated game state to all connected clients.
+        //
+        // NOTE: We want to broadcast the state update BEFORE adding the new client, such
+        // that the new client only recieves the current world state and all other clients
+        // receive the `PlayerAdded` message.
         self.broadcast(Update::PlayerAdded {
             index: player_index,
             data: self.players[player_index].clone(),
         });
+
+        // Add the new client, tracking which player it controls.
+        self.clients.insert(message.addr, player_index);
 
         // Return the current world state to the new client.
         WorldState {
@@ -194,6 +199,7 @@ where
 /// resulting from each action and user input. This minimizes the amount of
 /// data that needs to be sent to the clients when the game state changes.
 #[derive(Debug, Clone, Message, Serialize)]
+#[serde(tag = "type", content = "data")]
 pub enum Update {
     /// A new player was added to the board.
     PlayerAdded {
