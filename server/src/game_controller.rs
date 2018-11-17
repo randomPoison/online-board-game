@@ -32,7 +32,7 @@ impl GameController {
     }
 
     /// Broadcasts a message to all connected clients.
-    fn broadcast<M>(&self, message: M)
+    fn broadcast<M>(&self, message: &M)
     where
         M: 'static + Message + Clone + Send,
         M::Result: Send,

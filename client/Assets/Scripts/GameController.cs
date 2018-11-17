@@ -8,6 +8,8 @@ using UnityEngine;
 using UnityEngine.AddressableAssets;
 using UnityEngine.ResourceManagement;
 using UniRx.Async;
+using System.Threading.Tasks;
+using static UniRx.Async.UniTaskExtensions;
 
 public class GameController : MonoBehaviour
 {
@@ -21,7 +23,20 @@ public class GameController : MonoBehaviour
 
     private async void Start()
     {
+        try
+        {
+            await DoMainLoop();
+        }
+        catch (TaskCanceledException exception)
+        {
+            Debug.LogFormat("Main task was cancelled: {0}", exception);
+        }
+    }
+
+    private async UniTask DoMainLoop()
+    {
         Debug.Assert(_playerPrefab != null, "Player prefab wasn't setup");
+        Debug.Assert(_playerMovementPreviewPrefab != null, "Player movement preview prefab wasn't setup");
 
         // TODO: Handle an exception being thrown as a result of the connection failing.
         _socket = await WebSocket.ConnectAsync(new Uri("ws://localhost:8088/ws/"));
@@ -52,6 +67,8 @@ public class GameController : MonoBehaviour
             }
         }
 
+        // Run the main loop of the game, which means waiting for an incoming message and
+        // applying the update to the local state.
         while (true)
         {
             // TODO: Handle an exception being thrown while waiting (i.e. if we disconnect).
@@ -75,5 +92,6 @@ public class GameController : MonoBehaviour
     private void OnDestroy()
     {
         _socket.Close();
+        _socket = null;
     }
 }

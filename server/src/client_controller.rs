@@ -1,4 +1,3 @@
-use actix::fut::IntoActorFuture;
 use actix::prelude::*;
 use actix_web::ws::{Message as WebsocketMessage, ProtocolError, WebsocketContext};
 use crate::game::*;

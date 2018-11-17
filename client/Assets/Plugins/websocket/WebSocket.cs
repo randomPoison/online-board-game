@@ -221,6 +221,12 @@ public class WebSocket
 
     public void Close()
     {
+        foreach (var completion in _pendingTasks)
+        {
+            completion.TrySetCanceled();
+        }
+        _pendingTasks.Clear();
+
         _socket.CloseAsync();
     }
 #endif
