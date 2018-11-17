@@ -69,10 +69,7 @@ impl Handler<ClientConnected> for GameController {
         // TODO: Set a cap on how many players can be in the game at a time.
         let id = match self.unassigned_players.pop() {
             Some(id) => {
-                info!(
-                    "Assigning existing player {:?} to connected client",
-                    id,
-                );
+                info!("Assigning existing player {:?} to connected client", id,);
                 id
             }
 
@@ -82,39 +79,35 @@ impl Handler<ClientConnected> for GameController {
 
                 // Add a player corresponding to the new client.
                 //
-                // TODO: Handle a new client taking control of an existing player. This is something
-                // we'll want to do if a client disconnects and then reconnects, rather than creating
-                // a new player each time a new client connects.
-                //
                 // TODO: Use a better system for setting the initial position of players. Currently
                 // we start them at (num_players, 0), which doesn't account for the total size of
                 // the grid or give us any control over initial player positions.
-                let pos = GridPos {
-                    x: self.players.len(),
-                    y: 0,
-                };
-                self.players.insert(id, Player {
-                    pos,
+                let player = Player {
+                    pos: GridPos {
+                        x: self.players.len(),
+                        y: 0,
+                    },
+
                     health: Health {
                         max: 10,
                         current: 10,
                     },
+
                     pending_turn: Default::default(),
+                };
+
+                // Add the new player to the board.
+                self.players.insert(id, player.clone());
+
+                // Notify existing clients that a new player was added to the board.
+                self.broadcast(Update::PlayerAdded {
+                    id: id,
+                    data: player,
                 });
 
                 id
             }
         };
-
-        // Broadcast the updated game state to all connected clients.
-        //
-        // NOTE: We want to broadcast the state update BEFORE adding the new client, such
-        // that the new client only recieves the current world state and all other clients
-        // receive the `PlayerAdded` message.
-        self.broadcast(Update::PlayerAdded {
-            id: id,
-            data: self.players[&id].clone(),
-        });
 
         // Add the new client, tracking which player it controls.
         self.clients.insert(message.addr, id);
@@ -205,14 +198,8 @@ where
 #[serde(tag = "type", content = "data")]
 pub enum Update {
     /// A new player was added to the board.
-    PlayerAdded {
-        id: PlayerId,
-        data: Player,
-    },
+    PlayerAdded { id: PlayerId, data: Player },
 
     /// A player set their move action for the current turn.
-    SetMovement {
-        id: PlayerId,
-        pos: GridPos,
-    },
+    SetMovement { id: PlayerId, pos: GridPos },
 }
