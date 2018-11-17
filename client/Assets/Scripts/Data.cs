@@ -6,8 +6,9 @@ using UnityEngine;
 
 public class GameStateData
 {
+    // TODO: Create a strong type for player IDs.
     [JsonProperty("players")]
-    public List<PlayerData> Players { get; private set; }
+    public Dictionary<int, PlayerData> Players { get; private set; }
 }
 
 public class PlayerData

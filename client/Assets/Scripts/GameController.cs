@@ -49,21 +49,29 @@ public class GameController : MonoBehaviour
         Debug.LogFormat("Recieved initial state: {0}", state);
         Debug.LogFormat("Received initial state with {0} players", state.Players.Count);
 
+        var players = new Dictionary<int, GameObject>();
+        var movementPreviews = new Dictionary<int, GameObject>();
+
         // Create objects in the world as necessary based on the initial game state
         // when we first connect to the server.
-        foreach (var player in state.Players)
+        foreach (var (id, player) in state.Players)
         {
             // Create an object in the world for the player and set it to the world position
             // that corresponds to their grid position.
             var playerInstance = await Addressables.Instantiate<GameObject>(_playerPrefab);
             playerInstance.transform.localPosition = player.Pos.WorldPos;
 
+            players.Add(id, playerInstance);
+
             // Visualize the pending move action for the player, if they already have
             // one setup.
-            if (player.PendingTurn.Movement.HasValue)
+            var pendingMovement = player.PendingTurn?.Movement;
+            if (pendingMovement.HasValue)
             {
                 var movementPreview = await Addressables.Instantiate<GameObject>(_playerMovementPreviewPrefab);
-                movementPreview.transform.localPosition = player.PendingTurn.Movement.Value.WorldPos;
+                movementPreview.transform.localPosition = pendingMovement.Value.WorldPos;
+
+                movementPreviews.Add(id, movementPreview);
             }
         }
 

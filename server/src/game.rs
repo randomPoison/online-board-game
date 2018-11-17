@@ -29,6 +29,7 @@ pub struct Player {
     pub health: Health,
 
     /// The steps that the player has planned out for their next turn.
+    #[serde(skip_serializing_if = "PlayerTurn::is_empty")]
     pub pending_turn: PlayerTurn,
 }
 
@@ -38,8 +39,17 @@ pub struct Player {
 /// as many non-move actions as they choose to make.
 #[derive(Debug, Clone, Default, PartialEq, Eq, Hash, Serialize)]
 pub struct PlayerTurn {
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub movement: Option<GridPos>,
+
+    #[serde(skip_serializing_if = "Vec::is_empty")]
     pub actions: Vec<PlayerAction>,
+}
+
+impl PlayerTurn {
+    pub fn is_empty(&self) -> bool {
+        self.movement.is_none() && self.actions.is_empty()
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize)]

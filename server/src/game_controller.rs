@@ -14,16 +14,16 @@ use std::collections::HashMap;
 #[derive(Debug, Default)]
 pub struct GameController {
     /// Maps the client to the index of the player it controls.
-    clients: HashMap<ClientAddr, usize>,
+    clients: HashMap<ClientAddr, PlayerId>,
 
     /// List of players that are not currently assigned to a connected client.
     ///
     /// When a new client connects to the game, they will be given control of
     /// an existing player before a new player is created.
-    unassigned_players: Vec<usize>,
+    unassigned_players: Vec<PlayerId>,
 
     /// State data for all the players in the game.
-    players: Vec<Player>,
+    players: HashMap<PlayerId, Player>,
 }
 
 impl GameController {
@@ -32,7 +32,7 @@ impl GameController {
     }
 
     /// Broadcasts a message to all connected clients.
-    fn broadcast<M>(&self, message: &M)
+    fn broadcast<M>(&self, message: M)
     where
         M: 'static + Message + Clone + Send,
         M::Result: Send,
@@ -67,18 +67,18 @@ impl Handler<ClientConnected> for GameController {
         // players. Otherwise, create a new player for the client.
         //
         // TODO: Set a cap on how many players can be in the game at a time.
-        let player_index = match self.unassigned_players.pop() {
-            Some(player_index) => {
+        let id = match self.unassigned_players.pop() {
+            Some(id) => {
                 info!(
-                    "Assigning existing player {} to connected client",
-                    player_index
+                    "Assigning existing player {:?} to connected client",
+                    id,
                 );
-                player_index
+                id
             }
 
             None => {
-                let player_index = self.players.len();
-                info!("Creating player {} for connected client", player_index);
+                let id = PlayerId(self.players.len());
+                info!("Creating player {:?} for connected client", id);
 
                 // Add a player corresponding to the new client.
                 //
@@ -90,10 +90,10 @@ impl Handler<ClientConnected> for GameController {
                 // we start them at (num_players, 0), which doesn't account for the total size of
                 // the grid or give us any control over initial player positions.
                 let pos = GridPos {
-                    x: player_index,
+                    x: self.players.len(),
                     y: 0,
                 };
-                self.players.push(Player {
+                self.players.insert(id, Player {
                     pos,
                     health: Health {
                         max: 10,
@@ -102,10 +102,9 @@ impl Handler<ClientConnected> for GameController {
                     pending_turn: Default::default(),
                 });
 
-                player_index
+                id
             }
         };
-
 
         // Broadcast the updated game state to all connected clients.
         //
@@ -113,12 +112,12 @@ impl Handler<ClientConnected> for GameController {
         // that the new client only recieves the current world state and all other clients
         // receive the `PlayerAdded` message.
         self.broadcast(Update::PlayerAdded {
-            index: player_index,
-            data: self.players[player_index].clone(),
+            id: id,
+            data: self.players[&id].clone(),
         });
 
         // Add the new client, tracking which player it controls.
-        self.clients.insert(message.addr, player_index);
+        self.clients.insert(message.addr, id);
 
         // Return the current world state to the new client.
         WorldState {
@@ -158,19 +157,23 @@ impl Handler<InputMoveAction> for GameController {
 
         // Update the move action for the player controlled by the client that sent
         // the message.
-        let &player_index = self
+        let &id = self
             .clients
             .get(&message.client)
             .expect("No such client found");
-        self.players[player_index].pending_turn.movement = Some(message.pos);
+        self.players.get_mut(&id).unwrap().pending_turn.movement = Some(message.pos);
 
         // Broadcast the updated game state to all connected clients.
         self.broadcast(Update::SetMovement {
-            index: player_index,
+            id,
             pos: message.pos,
         });
     }
 }
+
+/// Unique identifier for a player in the game.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub struct PlayerId(usize);
 
 /// Game state update being broadcast to connected clients.
 ///
@@ -178,7 +181,7 @@ impl Handler<InputMoveAction> for GameController {
 /// notify connected clients of the new state.
 #[derive(Debug, Clone, Serialize)]
 pub struct WorldState {
-    players: Vec<Player>,
+    players: HashMap<PlayerId, Player>,
 }
 
 impl<A, M> actix::dev::MessageResponse<A, M> for WorldState
@@ -203,13 +206,13 @@ where
 pub enum Update {
     /// A new player was added to the board.
     PlayerAdded {
-        index: usize,
+        id: PlayerId,
         data: Player,
     },
 
     /// A player set their move action for the current turn.
     SetMovement {
-        index: usize,
+        id: PlayerId,
         pos: GridPos,
     },
 }

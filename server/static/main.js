@@ -3,23 +3,26 @@ let app = new Vue({
 
     data: {
         socket: null,
-        players: [],
+        players: {},
         movement: {},
     },
 
     created: function () {
         this.socket = new WebSocket('ws://localhost:8088/ws/');
 
-        this.socket.onmessage = (event) => {
+        let onUpdateMessage = event => {
             let payload = JSON.parse(event.data);
-            console.log('Received message:', payload);
+            console.log('Received update message:', payload);
 
-            // If the payload updates the list of players, apply the update
-            // to the local state.
-            if (payload.players != null) {
-                this.players = payload.players;
-            }
-        }
+            this.players = payload.players;
+        };
+
+        this.socket.onmessage = event => {
+            let payload = JSON.parse(event.data);
+            console.log('Received init message:', payload);
+
+            this.socket.onmessage = onUpdateMessage;
+        };
 
         this.socket.onclose = (event) => {
             console.log('Disconnected from server:', event);
