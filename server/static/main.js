@@ -14,12 +14,14 @@ let app = new Vue({
             let payload = JSON.parse(event.data);
             console.log('Received update message:', payload);
 
-            this.players = payload.players;
+            // TODO: Apply the update to the local state.
         };
 
         this.socket.onmessage = event => {
             let payload = JSON.parse(event.data);
             console.log('Received init message:', payload);
+
+            this.players = payload.players;
 
             this.socket.onmessage = onUpdateMessage;
         };
