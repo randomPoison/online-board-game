@@ -97,13 +97,10 @@ public class WebSocket
     Queue<TaskCompletionSource<byte[]>> _pendingTasks = new Queue<TaskCompletionSource<byte[]>>();
     Queue<byte[]> _pendingMessages = new Queue<byte[]>();
 
-    bool _isConnected = false;
-
     private WebSocket(Uri url, WebSocketSharp.WebSocket socket)
     {
         _url = url;
         _socket = socket;
-        _isConnected = true;
 
         // Register the listeners for incoming messages/errors.
         _socket.OnMessage += OnMessage;

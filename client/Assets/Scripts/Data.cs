@@ -68,8 +68,8 @@ public enum MessageType
 
 public struct PlayerAdded
 {
-    [JsonProperty("index")]
-    public readonly int Index;
+    [JsonProperty("id")]
+    public readonly int Id;
 
     [JsonProperty("data")]
     public readonly PlayerData Data;
@@ -77,8 +77,8 @@ public struct PlayerAdded
 
 public struct SetMovement
 {
-    [JsonProperty("index")]
-    public readonly int Index;
+    [JsonProperty("id")]
+    public readonly int Id;
 
     [JsonProperty("pos")]
     public readonly GridPos Pos;

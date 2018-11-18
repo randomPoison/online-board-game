@@ -86,12 +86,30 @@ public class GameController : MonoBehaviour
             {
                 case MessageType.PlayerAdded:
                     var playerAdded = update.Data.ToObject<PlayerAdded>();
-                    // TODO: Add the player to the local world.
+
+                    // Create an object in the world for the player and set it to the world position
+                    // that corresponds to their grid position.
+                    var playerInstance = await Addressables.Instantiate<GameObject>(_playerPrefab);
+                    playerInstance.transform.localPosition = playerAdded.Data.Pos.WorldPos;
+
+                    Debug.AssertFormat(!players.ContainsKey(playerAdded.Id), "Player with ID {0} already exists", playerAdded.Id);
+                    players.Add(playerAdded.Id, playerInstance);
+
                     break;
 
                 case MessageType.SetMovement:
                     var setMovement = update.Data.ToObject<SetMovement>();
-                    // TODO: Update the movement preview for the specified player.
+
+                    // Get the existing preview object, or create a new one if one doesn't
+                    // already exist.
+                    GameObject movementPreview;
+                    if (!movementPreviews.TryGetValue(setMovement.Id, out movementPreview)) {
+                        movementPreview = await Addressables.Instantiate<GameObject>(_playerMovementPreviewPrefab);
+                        movementPreviews.Add(setMovement.Id, movementPreview);
+                    }
+
+                    movementPreview.transform.localPosition = setMovement.Pos.WorldPos;
+
                     break;
             }
         }
