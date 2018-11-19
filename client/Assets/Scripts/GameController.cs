@@ -1,15 +1,9 @@
-﻿using Newtonsoft.Json;
-using Newtonsoft.Json.Serialization;
-using System;
-using System.Collections;
+﻿using System;
 using System.Collections.Generic;
-using System.Runtime.CompilerServices;
+using System.Threading.Tasks;
+using UniRx.Async;
 using UnityEngine;
 using UnityEngine.AddressableAssets;
-using UnityEngine.ResourceManagement;
-using UniRx.Async;
-using System.Threading.Tasks;
-using static UniRx.Async.UniTaskExtensions;
 
 public class GameController : MonoBehaviour
 {
@@ -19,7 +13,17 @@ public class GameController : MonoBehaviour
     [SerializeField]
     private AssetReference _playerMovementPreviewPrefab = null;
 
+    [SerializeField]
+    private Camera _camera = null;
+
     private WebSocket _socket;
+
+    private void Awake()
+    {
+        Debug.Assert(_playerPrefab != null, "Player prefab wasn't setup", this);
+        Debug.Assert(_playerMovementPreviewPrefab != null, "Player movement preview prefab wasn't setup", this);
+        Debug.Assert(_camera != null, "Camera hasn't been setup on game controller", this);
+    }
 
     private async void Start()
     {
@@ -35,9 +39,6 @@ public class GameController : MonoBehaviour
 
     private async UniTask DoMainLoop()
     {
-        Debug.Assert(_playerPrefab != null, "Player prefab wasn't setup");
-        Debug.Assert(_playerMovementPreviewPrefab != null, "Player movement preview prefab wasn't setup");
-
         // TODO: Handle an exception being thrown as a result of the connection failing.
         _socket = await WebSocket.ConnectAsync(new Uri("ws://localhost:8088/ws/"));
 
@@ -75,8 +76,35 @@ public class GameController : MonoBehaviour
             }
         }
 
-        // Run the main loop of the game, which means waiting for an incoming message and
-        // applying the update to the local state.
+        // Once the intial state has been received from the server, spawn two tasks to
+        // run concurrently:
+        //
+        // * One to listen for and handle incoming messages from the server.
+        // * One to handle player input every frame.
+        var handleMessages = HandleMessages(players, movementPreviews);
+        var handleInput = HandleInput();
+
+        await UniTask.WhenAll(handleMessages, handleInput);
+    }
+
+    private async UniTask HandleInput()
+    {
+        while (true)
+        {
+            if (Input.GetMouseButton(0))
+            {
+                var screenPos = Input.mousePosition;
+                var worldPos = _camera.ScreenToWorldPoint(new Vector3(screenPos.x, screenPos.y, _camera.transform.position.y));
+
+                Debug.DrawLine(_camera.transform.position, worldPos);
+            }
+
+            await UniTask.Yield();
+        }
+    }
+
+    private async UniTask HandleMessages(Dictionary<int, GameObject> players, Dictionary<int, GameObject> movementPreviews)
+    {
         while (true)
         {
             // TODO: Handle an exception being thrown while waiting (i.e. if we disconnect).
@@ -103,7 +131,8 @@ public class GameController : MonoBehaviour
                     // Get the existing preview object, or create a new one if one doesn't
                     // already exist.
                     GameObject movementPreview;
-                    if (!movementPreviews.TryGetValue(setMovement.Id, out movementPreview)) {
+                    if (!movementPreviews.TryGetValue(setMovement.Id, out movementPreview))
+                    {
                         movementPreview = await Addressables.Instantiate<GameObject>(_playerMovementPreviewPrefab);
                         movementPreviews.Add(setMovement.Id, movementPreview);
                     }
